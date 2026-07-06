@@ -2,7 +2,32 @@ English | [Русский](README.ru.md)
 
 # BlockBlast!
 
+![Platform](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)
+![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
+![C#](https://img.shields.io/badge/C%23-WPF-239120?logo=csharp&logoColor=white)
+![Localization](https://img.shields.io/badge/localization-EN%20%7C%20RU-blue)
+![License](https://img.shields.io/badge/license-MIT-brightgreen)
+[![Release](https://img.shields.io/github/v/release/sidewardone/blockblastpc)](https://github.com/sidewardone/blockblastpc/releases/latest)
+
 A bright, casual block puzzle game for Windows desktop, inspired by the popular mobile game *Block Blast*. Built with WPF and .NET 8.
+
+## Download
+
+Grab the latest Windows installer from the **[Releases page](https://github.com/sidewardone/blockblastpc/releases/latest)** — `BlockBlast-Setup.exe`. No .NET installation required, the app is fully self-contained.
+
+## Table of contents
+
+- [Gameplay](#gameplay)
+- [Shapes](#shapes)
+- [Scoring](#scoring)
+- [Controls](#controls)
+- [Localization](#localization)
+- [Best score](#best-score)
+- [Project structure](#project-structure)
+- [Building and running from source](#building-and-running-from-source)
+- [Publishing a self-contained executable](#publishing-a-self-contained-executable)
+- [Building the Windows installer](#building-the-windows-installer)
+- [License](#license)
 
 ## Gameplay
 
@@ -26,13 +51,17 @@ The full classic set is included: single cells, lines of 1–5 cells (horizontal
 
 ## Controls
 
-- **Mouse drag-and-drop** — pick up a shape from the tray and drop it on the board.
-- **RU / EN button** (top-right corner) — toggle the interface language at any time.
-- **Start again** — restart after Game Over.
+| Action | Input |
+|---|---|
+| Place a shape | Drag from the tray and drop it on the board |
+| Switch language | Click the **RU / EN** button (top-right corner) |
+| Restart after Game Over | Click **Start again** |
 
 ## Localization
 
-The interface starts in the language matching your Windows system locale (Russian if your Windows UI language is Russian, English otherwise), and can be switched anytime with the language button.
+🇬🇧 English · 🇷🇺 Русский
+
+The interface starts in the language matching your Windows system locale (Russian if your Windows UI language is Russian, English otherwise), and can be switched anytime with the language button in the top-right corner.
 
 ## Best score
 
