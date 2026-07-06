@@ -78,12 +78,17 @@
                 </Border>
             </StackPanel>
 
-            <Button x:Name="LangButton"
-                    Grid.Column="2"
-                    Content="RU"
-                    Style="{StaticResource RoundButtonStyle}"
-                    HorizontalAlignment="Right" VerticalAlignment="Center"
-                    Click="LangButton_Click"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button x:Name="BoardSizeButton"
+                        Content="8x8"
+                        Style="{StaticResource RoundButtonStyle}"
+                        Margin="0,0,8,0"
+                        Click="BoardSizeButton_Click"/>
+                <Button x:Name="LangButton"
+                        Content="RU"
+                        Style="{StaticResource RoundButtonStyle}"
+                        Click="LangButton_Click"/>
+            </StackPanel>
         </Grid>
 
         <Viewbox Grid.Row="1" Stretch="Uniform" Margin="16">
@@ -155,6 +160,64 @@
                             FontSize="16"
                             Padding="26,12"
                             Click="RestartButton_Click"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <Border x:Name="BoardSizeOverlay"
+                Grid.Row="0" Grid.RowSpan="3"
+                Background="#CC1B1030"
+                Visibility="Collapsed">
+            <Border Background="White"
+                    CornerRadius="24"
+                    Padding="36,30"
+                    MaxWidth="360"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel HorizontalAlignment="Center">
+                    <TextBlock x:Name="BoardSizeTitleText"
+                               Text="Board size"
+                               FontSize="24" FontWeight="Black"
+                               Foreground="#FF5A3FBE"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,6"/>
+                    <TextBlock x:Name="BoardSizeHintText"
+                               Text="Starts a new game"
+                               FontSize="13"
+                               Foreground="#FF8A7FB0"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,18"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="Size6Button"
+                                Content="6x6"
+                                Tag="6"
+                                Style="{StaticResource RoundButtonStyle}"
+                                Background="#FF5A3FBE"
+                                Foreground="White"
+                                Margin="4,0"
+                                Click="BoardSizeOptionButton_Click"/>
+                        <Button x:Name="Size8Button"
+                                Content="8x8"
+                                Tag="8"
+                                Style="{StaticResource RoundButtonStyle}"
+                                Background="#FF5A3FBE"
+                                Foreground="White"
+                                Margin="4,0"
+                                Click="BoardSizeOptionButton_Click"/>
+                        <Button x:Name="Size10Button"
+                                Content="10x10"
+                                Tag="10"
+                                Style="{StaticResource RoundButtonStyle}"
+                                Background="#FF5A3FBE"
+                                Foreground="White"
+                                Margin="4,0"
+                                Click="BoardSizeOptionButton_Click"/>
+                    </StackPanel>
+                    <Button x:Name="BoardSizeCancelButton"
+                            Content="Cancel"
+                            Style="{StaticResource RoundButtonStyle}"
+                            Margin="0,18,0,0"
+                            Click="BoardSizeCancelButton_Click"/>
                 </StackPanel>
             </Border>
         </Border>

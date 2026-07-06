@@ -33,6 +33,9 @@ public static class Loc
         ["Restart"] = ("Start again", "Начать заново"),
         ["Combo"] = ("Combo x{0}", "Комбо x{0}"),
         ["NewBest"] = ("New record!", "Новый рекорд!"),
+        ["BoardSize"] = ("Board size", "Размер поля"),
+        ["BoardSizeHint"] = ("Starts a new game", "Начинает новую игру"),
+        ["Cancel"] = ("Cancel", "Отмена"),
     };
 
     public static string Get(string key)

@@ -31,17 +31,20 @@ Grab the latest Windows installer from the **[Releases page](https://github.com/
 
 ## Gameplay
 
-- The board is an 8x8 grid.
+- Choose a board size — 6x6, 8x8 (classic), or 10x10 — anytime from the top bar.
 - Three random block shapes are offered in a tray at the bottom of the screen at all times.
-- Drag a shape from the tray onto the board with the mouse. While dragging, the cells the shape would occupy are highlighted green (valid placement) or red (invalid — occupied or out of bounds).
-- Drop the shape to place it. Once all three tray shapes have been used, three new random shapes appear.
+- Pick up a shape either way you like (both work interchangeably, see [Controls](#controls)):
+  - **Tap-to-place**: click a shape (or press `1`/`2`/`3`) to have it stick to your cursor, then click the board to confirm.
+  - **Classic drag**: press and drag a shape straight onto the board, then release.
+- While a shape is following the cursor, the cells it would occupy are highlighted green (valid placement) or red (invalid — occupied or out of bounds), and it snaps gently to the nearest valid spot when you're close.
+- Drop/confirm the shape to place it. Once all three tray shapes have been used, three new random shapes appear — the game always makes sure at least one of them can legally be placed somewhere, as long as the board still has room for it.
 - Completely filling a row or column clears it with a flash/fade animation.
 - Clearing multiple lines in a row (without a placement in between that fails to clear anything) builds a combo streak, shown on screen as "Combo x2", "Combo x3", etc., multiplying your bonus score.
 - The game ends when none of the three current shapes can be placed anywhere on the board. A Game Over screen shows your final score and lets you start again.
 
 ## Shapes
 
-The full classic set is included: single cells, lines of 1–5 cells (horizontal and vertical), 2x2 and 3x3 squares, L/J tetrominoes, T-tetrominoes, S/Z zigzags, small 3-cell corners, large 5-cell corners, and the plus shape. Each shape is drawn in a random bright color.
+The exact classic Block Blast set is used: single cells, lines of 1–5 cells (horizontal and vertical), 2x2 and 3x3 squares, a 2x3/3x2 solid rectangle, L/J tetrominoes, T-tetrominoes, S/Z zigzags, small 3-cell corners (weighted to appear more often, matching the original), and large 5-cell corners. Each shape is drawn in a random bright color.
 
 ## Scoring
 
@@ -53,7 +56,10 @@ The full classic set is included: single cells, lines of 1–5 cells (horizontal
 
 | Action | Input |
 |---|---|
-| Place a shape | Drag from the tray and drop it on the board |
+| Pick up a shape, tap-to-place style | Click a shape in the tray, or press `1` / `2` / `3` |
+| Confirm placement (tap-to-place mode) | Click the board where you want it |
+| Pick up and drag a shape, classic style | Press and hold a shape, drag it onto the board, release to drop |
+| Change board size | Click the size button (e.g. **8x8**, top bar) and pick 6x6 / 8x8 / 10x10 — starts a new game |
 | Switch language | Click the **RU / EN** button (top-right corner) |
 | Restart after Game Over | Click **Start again** |
 

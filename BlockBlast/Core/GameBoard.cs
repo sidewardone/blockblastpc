@@ -1,17 +1,26 @@
-using System;
 using System.Collections.Generic;
 
 namespace BlockBlast.Core;
 
 public sealed class GameBoard
 {
-    public const int Size = 8;
+    public const int MinSize = 6;
+    public const int MaxSize = 10;
+    public const int DefaultSize = 8;
 
-    private readonly RgbColor?[,] _cells = new RgbColor?[Size, Size];
+    public int Size { get; }
+
+    private readonly RgbColor?[,] _cells;
+
+    public GameBoard(int size)
+    {
+        Size = size;
+        _cells = new RgbColor?[size, size];
+    }
 
     public RgbColor? CellAt(int row, int col) => _cells[row, col];
 
-    public static bool IsInside(int row, int col) => row >= 0 && row < Size && col >= 0 && col < Size;
+    public bool IsInside(int row, int col) => row >= 0 && row < Size && col >= 0 && col < Size;
 
     public bool CanPlace(Shape shape, int originRow, int originCol)
     {
@@ -123,8 +132,31 @@ public sealed class GameBoard
         return false;
     }
 
-    public void Reset()
+    public bool HasEmptyCell()
     {
-        Array.Clear(_cells, 0, _cells.Length);
+        for (int r = 0; r < Size; r++)
+        {
+            for (int c = 0; c < Size; c++)
+            {
+                if (!_cells[r, c].HasValue)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public GameBoard Clone()
+    {
+        var clone = new GameBoard(Size);
+        for (int r = 0; r < Size; r++)
+        {
+            for (int c = 0; c < Size; c++)
+            {
+                clone._cells[r, c] = _cells[r, c];
+            }
+        }
+        return clone;
     }
 }

@@ -15,63 +15,88 @@ namespace BlockBlast;
 
 public partial class MainWindow : Window
 {
-    private const int Size = GameBoard.Size;
     private const double BoardCellSize = 52;
     private const double BoardGap = 4;
     private const double TrayCellSize = 26;
     private const double TrayGap = 3;
+    private const double DragThreshold = 8.0;
 
     private static readonly Brush ValidPreviewBrush = new SolidColorBrush(Color.FromArgb(150, 76, 230, 140));
     private static readonly Brush InvalidPreviewBrush = new SolidColorBrush(Color.FromArgb(150, 255, 80, 80));
 
+    private enum PointerMode
+    {
+        None,
+        Pending,
+        Dragging,
+        Armed,
+    }
+
     private readonly GameEngine _engine;
 
-    private readonly Border[,] _previewOverlays = new Border[Size, Size];
-    private readonly Border?[,] _cellBlocks = new Border[Size, Size];
+    private Border[,] _previewOverlays = new Border[0, 0];
+    private Border?[,] _cellBlocks = new Border?[0, 0];
     private readonly List<(int Row, int Col)> _activePreviewCells = new();
 
     private readonly Border[] _traySlotContainers = new Border[3];
     private readonly Canvas?[] _trayVisuals = new Canvas[3];
 
-    private bool _dragging;
-    private int _dragIndex = -1;
-    private Shape? _dragShape;
-    private Canvas? _dragGhost;
+    private PointerMode _pointerMode = PointerMode.None;
+    private int _activeIndex = -1;
+    private Shape? _activeShape;
+    private Canvas? _ghost;
+    private ScaleTransform? _ghostScale;
     private int _grabRow;
     private int _grabCol;
     private Point _grabOffset;
-    private bool _dragValid;
-    private int _dragOriginRow;
-    private int _dragOriginCol;
+    private Point _pointerDownPos;
+    private bool _resolvedValid;
+    private int _resolvedRow;
+    private int _resolvedCol;
 
     public MainWindow()
     {
         InitializeComponent();
 
         int best = SaveManager.LoadBestScore();
-        _engine = new GameEngine(best);
+        _engine = new GameEngine(GameBoard.DefaultSize, best);
 
         Loc.LanguageChanged += UpdateTexts;
 
-        BuildBoard();
+        RebuildBoardUI();
         BuildTray();
         UpdateScoreTexts();
         UpdateTexts();
+        UpdateBoardSizeButtonText();
+
+        MouseMove += Window_MouseMove;
+        MouseLeftButtonDown += Window_MouseLeftButtonDown;
+        PreviewKeyDown += Window_PreviewKeyDown;
     }
 
-    private void BuildBoard()
+    private void RebuildBoardUI()
     {
+        int size = _engine.Board.Size;
+
+        BoardGrid.Children.Clear();
         BoardGrid.RowDefinitions.Clear();
         BoardGrid.ColumnDefinitions.Clear();
-        for (int i = 0; i < Size; i++)
+        BoardGrid.Width = size * BoardCellSize;
+        BoardGrid.Height = size * BoardCellSize;
+
+        for (int i = 0; i < size; i++)
         {
             BoardGrid.RowDefinitions.Add(new RowDefinition());
             BoardGrid.ColumnDefinitions.Add(new ColumnDefinition());
         }
 
-        for (int r = 0; r < Size; r++)
+        _previewOverlays = new Border[size, size];
+        _cellBlocks = new Border?[size, size];
+        _activePreviewCells.Clear();
+
+        for (int r = 0; r < size; r++)
         {
-            for (int c = 0; c < Size; c++)
+            for (int c = 0; c < size; c++)
             {
                 var slot = new Border
                 {
@@ -99,27 +124,21 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefreshBoardVisuals()
-    {
-        for (int r = 0; r < Size; r++)
-        {
-            for (int c = 0; c < Size; c++)
-            {
-                if (_cellBlocks[r, c] != null)
-                {
-                    BoardGrid.Children.Remove(_cellBlocks[r, c]);
-                    _cellBlocks[r, c] = null;
-                }
-            }
-        }
-    }
-
     private void BuildTray()
     {
         TrayPanel.Children.Clear();
         for (int i = 0; i < 3; i++)
         {
-            var container = new Border { Width = 150, Height = 150, Margin = new Thickness(4) };
+            var container = new Border
+            {
+                Width = 150,
+                Height = 150,
+                Margin = new Thickness(4),
+                Background = Brushes.Transparent,
+                Cursor = Cursors.Hand,
+            };
+            int index = i;
+            container.MouseLeftButtonDown += (_, e) => TrayContainer_MouseLeftButtonDown(index, e);
             _traySlotContainers[i] = container;
             TrayPanel.Children.Add(container);
             RenderTrayShape(i);
@@ -141,11 +160,9 @@ public partial class MainWindow : Window
         var canvas = ShapeVisualBuilder.Build(shape, TrayCellSize, TrayGap);
         canvas.HorizontalAlignment = HorizontalAlignment.Center;
         canvas.VerticalAlignment = VerticalAlignment.Center;
-        canvas.Cursor = Cursors.Hand;
+        canvas.IsHitTestVisible = false;
         container.Child = canvas;
         _trayVisuals[index] = canvas;
-
-        canvas.MouseLeftButtonDown += (_, e) => StartDrag(index, e);
 
         canvas.RenderTransformOrigin = new Point(0.5, 0.5);
         var scaleT = new ScaleTransform(0.4, 0.4);
@@ -158,23 +175,30 @@ public partial class MainWindow : Window
         scaleT.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.4, 1, TimeSpan.FromMilliseconds(260)) { EasingFunction = spawnEase });
     }
 
-    private void StartDrag(int trayIndex, MouseButtonEventArgs e)
+    private void TrayContainer_MouseLeftButtonDown(int index, MouseButtonEventArgs e)
     {
-        if (_dragging)
+        var shape = _engine.Tray[index];
+        if (shape == null)
         {
             return;
         }
 
-        var shape = _engine.Tray[trayIndex];
-        var canvas = _trayVisuals[trayIndex];
-        if (shape == null || canvas == null)
+        if (_pointerMode == PointerMode.Dragging)
         {
             return;
         }
 
-        _dragging = true;
-        _dragIndex = trayIndex;
-        _dragShape = shape;
+        if (_pointerMode != PointerMode.None)
+        {
+            CancelActive();
+        }
+
+        var container = _traySlotContainers[index];
+        var canvas = _trayVisuals[index]!;
+
+        _activeIndex = index;
+        _activeShape = shape;
+        _pointerMode = PointerMode.Pending;
 
         var posInCanvas = e.GetPosition(canvas);
         _grabCol = Math.Clamp((int)(posInCanvas.X / TrayCellSize), 0, shape.Width - 1);
@@ -185,77 +209,333 @@ public partial class MainWindow : Window
         double scaleFactor = BoardCellSize / TrayCellSize;
         _grabOffset = new Point(offsetXInCell * scaleFactor, offsetYInCell * scaleFactor);
 
-        _dragGhost = ShapeVisualBuilder.Build(shape, BoardCellSize, BoardGap);
-        _dragGhost.Opacity = 0.95;
-        _dragGhost.IsHitTestVisible = false;
-        Panel.SetZIndex(_dragGhost, 100);
-        OverlayCanvas.Children.Add(_dragGhost);
+        CreateGhost(shape);
+        canvas.Opacity = 0.15;
 
-        canvas.Opacity = 0.2;
+        _pointerDownPos = e.GetPosition(OverlayCanvas);
+        UpdatePointerVisuals(_pointerDownPos, e.GetPosition(BoardGrid));
 
-        UpdateGhostPosition(e.GetPosition(OverlayCanvas));
-        UpdateHover(e.GetPosition(BoardGrid));
-
-        canvas.CaptureMouse();
-        canvas.MouseMove += DragMouseMove;
-        canvas.MouseLeftButtonUp += DragMouseUp;
-        canvas.LostMouseCapture += DragLostCapture;
+        container.CaptureMouse();
+        container.MouseMove += Container_MouseMove;
+        container.MouseLeftButtonUp += Container_MouseLeftButtonUp;
+        container.LostMouseCapture += Container_LostMouseCapture;
 
         e.Handled = true;
     }
 
-    private void DragMouseMove(object sender, MouseEventArgs e)
+    private void Container_MouseMove(object sender, MouseEventArgs e)
     {
-        if (!_dragging)
+        if (_pointerMode != PointerMode.Pending && _pointerMode != PointerMode.Dragging)
         {
             return;
         }
 
-        UpdateGhostPosition(e.GetPosition(OverlayCanvas));
-        UpdateHover(e.GetPosition(BoardGrid));
+        var overlayPos = e.GetPosition(OverlayCanvas);
+        UpdatePointerVisuals(overlayPos, e.GetPosition(BoardGrid));
+
+        if (_pointerMode == PointerMode.Pending)
+        {
+            double dx = overlayPos.X - _pointerDownPos.X;
+            double dy = overlayPos.Y - _pointerDownPos.Y;
+            if (dx * dx + dy * dy > DragThreshold * DragThreshold)
+            {
+                _pointerMode = PointerMode.Dragging;
+            }
+        }
     }
 
-    private void DragMouseUp(object sender, MouseButtonEventArgs e)
+    private void Container_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        EndDrag(commit: true);
+        FinishPointerGesture();
     }
 
-    private void DragLostCapture(object sender, MouseEventArgs e)
+    private void Container_LostMouseCapture(object sender, MouseEventArgs e)
     {
-        EndDrag(commit: false);
+        if (_pointerMode == PointerMode.Pending || _pointerMode == PointerMode.Dragging)
+        {
+            CancelActive();
+        }
     }
 
-    private void UpdateGhostPosition(Point overlayPos)
+    private void FinishPointerGesture()
     {
-        if (_dragGhost == null)
+        var priorMode = _pointerMode;
+        var index = _activeIndex;
+
+        _pointerMode = PointerMode.None;
+
+        var container = index >= 0 ? _traySlotContainers[index] : null;
+        if (container != null)
+        {
+            container.MouseMove -= Container_MouseMove;
+            container.MouseLeftButtonUp -= Container_MouseLeftButtonUp;
+            container.LostMouseCapture -= Container_LostMouseCapture;
+            if (container.IsMouseCaptured)
+            {
+                container.ReleaseMouseCapture();
+            }
+        }
+
+        if (priorMode == PointerMode.Dragging)
+        {
+            if (_resolvedValid)
+            {
+                CommitPlacement(index, _resolvedRow, _resolvedCol);
+            }
+            else
+            {
+                ReturnActiveToTray();
+            }
+        }
+        else if (priorMode == PointerMode.Pending)
+        {
+            _pointerMode = PointerMode.Armed;
+        }
+    }
+
+    private void CancelActive()
+    {
+        if (_activeIndex < 0)
         {
             return;
         }
 
-        double left = overlayPos.X - _grabCol * BoardCellSize - _grabOffset.X;
-        double top = overlayPos.Y - _grabRow * BoardCellSize - _grabOffset.Y;
-        Canvas.SetLeft(_dragGhost, left);
-        Canvas.SetTop(_dragGhost, top);
+        var container = _traySlotContainers[_activeIndex];
+        if (container != null)
+        {
+            container.MouseMove -= Container_MouseMove;
+            container.MouseLeftButtonUp -= Container_MouseLeftButtonUp;
+            container.LostMouseCapture -= Container_LostMouseCapture;
+            if (container.IsMouseCaptured)
+            {
+                container.ReleaseMouseCapture();
+            }
+        }
+
+        ReturnActiveToTray();
     }
 
-    private void UpdateHover(Point boardPos)
+    private void ReturnActiveToTray()
     {
-        if (_dragShape == null)
+        if (_activeIndex >= 0)
+        {
+            var canvas = _trayVisuals[_activeIndex];
+            if (canvas != null)
+            {
+                canvas.Opacity = 1;
+            }
+        }
+
+        ClearPreviewHighlights();
+
+        if (_ghost != null)
+        {
+            OverlayCanvas.Children.Remove(_ghost);
+            _ghost = null;
+            _ghostScale = null;
+        }
+
+        _pointerMode = PointerMode.None;
+        _activeIndex = -1;
+        _activeShape = null;
+    }
+
+    private void CreateGhost(Shape shape)
+    {
+        _ghost = ShapeVisualBuilder.Build(shape, BoardCellSize, BoardGap);
+        _ghost.Opacity = 0.95;
+        _ghost.IsHitTestVisible = false;
+        _ghost.RenderTransformOrigin = new Point(0, 0);
+        _ghostScale = new ScaleTransform(1, 1);
+        _ghost.RenderTransform = _ghostScale;
+        Panel.SetZIndex(_ghost, 100);
+        OverlayCanvas.Children.Add(_ghost);
+    }
+
+    private void Window_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_pointerMode != PointerMode.Armed)
+        {
+            return;
+        }
+
+        UpdatePointerVisuals(e.GetPosition(OverlayCanvas), e.GetPosition(BoardGrid));
+    }
+
+    private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_pointerMode != PointerMode.Armed)
+        {
+            return;
+        }
+
+        if (_resolvedValid)
+        {
+            CommitPlacement(_activeIndex, _resolvedRow, _resolvedCol);
+        }
+    }
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        int? index = e.Key switch
+        {
+            Key.D1 or Key.NumPad1 => 0,
+            Key.D2 or Key.NumPad2 => 1,
+            Key.D3 or Key.NumPad3 => 2,
+            _ => null,
+        };
+
+        if (index.HasValue)
+        {
+            SelectViaKeyboard(index.Value);
+            e.Handled = true;
+        }
+    }
+
+    private void SelectViaKeyboard(int index)
+    {
+        var shape = _engine.Tray[index];
+        if (shape == null)
+        {
+            return;
+        }
+
+        if (_pointerMode == PointerMode.Dragging || _pointerMode == PointerMode.Pending)
+        {
+            return;
+        }
+
+        if (_activeIndex == index && _pointerMode == PointerMode.Armed)
+        {
+            return;
+        }
+
+        if (_pointerMode == PointerMode.Armed)
+        {
+            CancelActive();
+        }
+
+        _activeIndex = index;
+        _activeShape = shape;
+        _pointerMode = PointerMode.Armed;
+
+        var anchor = GetAnchorCell(shape);
+        _grabRow = anchor.Row;
+        _grabCol = anchor.Col;
+        _grabOffset = new Point(BoardCellSize / 2.0, BoardCellSize / 2.0);
+
+        var canvas = _trayVisuals[index];
+        if (canvas != null)
+        {
+            canvas.Opacity = 0.15;
+        }
+
+        CreateGhost(shape);
+        UpdatePointerVisuals(Mouse.GetPosition(OverlayCanvas), Mouse.GetPosition(BoardGrid));
+    }
+
+    private static ShapeCell GetAnchorCell(Shape shape)
+    {
+        double centerRow = (shape.Height - 1) / 2.0;
+        double centerCol = (shape.Width - 1) / 2.0;
+        var best = shape.Cells[0];
+        double bestDist = double.MaxValue;
+        foreach (var cell in shape.Cells)
+        {
+            double dist = ((cell.Row - centerRow) * (cell.Row - centerRow)) + ((cell.Col - centerCol) * (cell.Col - centerCol));
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                best = cell;
+            }
+        }
+        return best;
+    }
+
+    private void UpdatePointerVisuals(Point overlayPos, Point boardPos)
+    {
+        if (_activeShape == null || _ghost == null || _ghostScale == null)
         {
             return;
         }
 
         int hoverCol = (int)Math.Floor(boardPos.X / BoardCellSize);
         int hoverRow = (int)Math.Floor(boardPos.Y / BoardCellSize);
-        int originRow = hoverRow - _grabRow;
-        int originCol = hoverCol - _grabCol;
+        int rawRow = hoverRow - _grabRow;
+        int rawCol = hoverCol - _grabCol;
 
-        _dragOriginRow = originRow;
-        _dragOriginCol = originCol;
-        _dragValid = _engine.CanPlace(_dragIndex, originRow, originCol);
+        var (row, col, valid, snapped) = ResolvePlacement(_activeShape, rawRow, rawCol);
+        _resolvedRow = row;
+        _resolvedCol = col;
+        _resolvedValid = valid;
 
         ClearPreviewHighlights();
-        ApplyPreviewHighlights(_dragShape, originRow, originCol, _dragValid);
+        ApplyPreviewHighlights(_activeShape, row, col, valid);
+
+        double effectiveCellSize = GetEffectiveCellSize();
+        double scale = effectiveCellSize / BoardCellSize;
+        _ghostScale.ScaleX = scale;
+        _ghostScale.ScaleY = scale;
+
+        if (snapped)
+        {
+            var topLeft = BoardGrid.TranslatePoint(new Point(col * BoardCellSize, row * BoardCellSize), OverlayCanvas);
+            Canvas.SetLeft(_ghost, topLeft.X);
+            Canvas.SetTop(_ghost, topLeft.Y);
+        }
+        else
+        {
+            double left = overlayPos.X - (_grabCol * effectiveCellSize) - (_grabOffset.X * scale);
+            double top = overlayPos.Y - (_grabRow * effectiveCellSize) - (_grabOffset.Y * scale);
+            Canvas.SetLeft(_ghost, left);
+            Canvas.SetTop(_ghost, top);
+        }
+    }
+
+    private double GetEffectiveCellSize()
+    {
+        var p0 = BoardGrid.TranslatePoint(new Point(0, 0), OverlayCanvas);
+        var p1 = BoardGrid.TranslatePoint(new Point(BoardCellSize, 0), OverlayCanvas);
+        return p1.X - p0.X;
+    }
+
+    private (int Row, int Col, bool Valid, bool Snapped) ResolvePlacement(Shape shape, int rawRow, int rawCol)
+    {
+        if (_engine.Board.CanPlace(shape, rawRow, rawCol))
+        {
+            return (rawRow, rawCol, true, false);
+        }
+
+        (int Row, int Col)? best = null;
+        int bestDist = int.MaxValue;
+        for (int dr = -1; dr <= 1; dr++)
+        {
+            for (int dc = -1; dc <= 1; dc++)
+            {
+                if (dr == 0 && dc == 0)
+                {
+                    continue;
+                }
+                int r = rawRow + dr;
+                int c = rawCol + dc;
+                if (_engine.Board.CanPlace(shape, r, c))
+                {
+                    int dist = (dr * dr) + (dc * dc);
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        best = (r, c);
+                    }
+                }
+            }
+        }
+
+        if (best.HasValue)
+        {
+            return (best.Value.Row, best.Value.Col, true, true);
+        }
+
+        return (rawRow, rawCol, false, false);
     }
 
     private void ApplyPreviewHighlights(Shape shape, int originRow, int originCol, bool valid)
@@ -264,7 +544,7 @@ public partial class MainWindow : Window
         {
             int r = originRow + cell.Row;
             int c = originCol + cell.Col;
-            if (!GameBoard.IsInside(r, c))
+            if (!_engine.Board.IsInside(r, c))
             {
                 continue;
             }
@@ -285,47 +565,20 @@ public partial class MainWindow : Window
         _activePreviewCells.Clear();
     }
 
-    private void EndDrag(bool commit)
-    {
-        if (!_dragging)
-        {
-            return;
-        }
-        _dragging = false;
-
-        var canvas = _trayVisuals[_dragIndex];
-        if (canvas != null)
-        {
-            canvas.MouseMove -= DragMouseMove;
-            canvas.MouseLeftButtonUp -= DragMouseUp;
-            canvas.LostMouseCapture -= DragLostCapture;
-            if (canvas.IsMouseCaptured)
-            {
-                canvas.ReleaseMouseCapture();
-            }
-            canvas.Opacity = 1;
-        }
-
-        ClearPreviewHighlights();
-
-        if (_dragGhost != null)
-        {
-            OverlayCanvas.Children.Remove(_dragGhost);
-            _dragGhost = null;
-        }
-
-        if (commit && _dragValid && _dragShape != null)
-        {
-            CommitPlacement(_dragIndex, _dragOriginRow, _dragOriginCol);
-        }
-
-        _dragIndex = -1;
-        _dragShape = null;
-    }
-
     private void CommitPlacement(int trayIndex, int row, int col)
     {
         var shape = _engine.Tray[trayIndex]!;
+
+        ClearPreviewHighlights();
+        if (_ghost != null)
+        {
+            OverlayCanvas.Children.Remove(_ghost);
+            _ghost = null;
+            _ghostScale = null;
+        }
+        _pointerMode = PointerMode.None;
+        _activeIndex = -1;
+        _activeShape = null;
 
         var container = _traySlotContainers[trayIndex];
         container.Child = null;
@@ -383,17 +636,18 @@ public partial class MainWindow : Window
 
     private void AnimateLineClear(IReadOnlyList<int> rows, IReadOnlyList<int> cols, Action onComplete)
     {
+        int size = _engine.Board.Size;
         var cellsToClear = new HashSet<(int Row, int Col)>();
         foreach (var r in rows)
         {
-            for (int c = 0; c < Size; c++)
+            for (int c = 0; c < size; c++)
             {
                 cellsToClear.Add((r, c));
             }
         }
         foreach (var c in cols)
         {
-            for (int r = 0; r < Size; r++)
+            for (int r = 0; r < size; r++)
             {
                 cellsToClear.Add((r, c));
             }
@@ -559,7 +813,10 @@ public partial class MainWindow : Window
         GameOverBestLabelText.Text = Loc.Get("BestScoreLabel");
         GameOverNewBestText.Text = Loc.Get("NewBest");
         RestartButton.Content = Loc.Get("Restart");
-        LangButton.Content = Loc.Current == BlockBlast.Localization.Language.English ? "RU" : "EN";
+        BoardSizeTitleText.Text = Loc.Get("BoardSize");
+        BoardSizeHintText.Text = Loc.Get("BoardSizeHint");
+        BoardSizeCancelButton.Content = Loc.Get("Cancel");
+        LangButton.Content = Loc.Current == Localization.Language.English ? "RU" : "EN";
     }
 
     private void LangButton_Click(object sender, RoutedEventArgs e)
@@ -571,11 +828,47 @@ public partial class MainWindow : Window
     {
         GameOverOverlay.Visibility = Visibility.Collapsed;
         _engine.Restart();
-        RefreshBoardVisuals();
-        for (int i = 0; i < 3; i++)
-        {
-            RenderTrayShape(i);
-        }
+        RebuildBoardUI();
+        BuildTray();
         UpdateScoreTexts();
+    }
+
+    private void BoardSizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pointerMode != PointerMode.None)
+        {
+            CancelActive();
+        }
+
+        BoardSizeOverlay.Opacity = 0;
+        BoardSizeOverlay.Visibility = Visibility.Visible;
+        BoardSizeOverlay.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)));
+    }
+
+    private void BoardSizeOptionButton_Click(object sender, RoutedEventArgs e)
+    {
+        var button = (Button)sender;
+        int newSize = int.Parse((string)button.Tag);
+        BoardSizeOverlay.Visibility = Visibility.Collapsed;
+
+        if (newSize != _engine.Board.Size)
+        {
+            _engine.Restart(newSize);
+            RebuildBoardUI();
+            BuildTray();
+            UpdateScoreTexts();
+        }
+
+        UpdateBoardSizeButtonText();
+    }
+
+    private void BoardSizeCancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        BoardSizeOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void UpdateBoardSizeButtonText()
+    {
+        BoardSizeButton.Content = $"{_engine.Board.Size}x{_engine.Board.Size}";
     }
 }

@@ -8,7 +8,7 @@
     <AssemblyName>BlockBlast</AssemblyName>
     <RootNamespace>BlockBlast</RootNamespace>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>BlockBlast!</Product>
     <Company>BlockBlast</Company>
     <SelfContained>true</SelfContained>

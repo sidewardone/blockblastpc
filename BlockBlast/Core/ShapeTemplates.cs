@@ -1,35 +1,33 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BlockBlast.Core;
 
 public static class ShapeTemplates
 {
-    public static IReadOnlyList<ShapeCell[]> All { get; } = Build();
+    public static IReadOnlyList<IReadOnlyList<ShapeCell[]>> Families { get; } = Build();
 
-    private static List<ShapeCell[]> Build()
+    private static List<IReadOnlyList<ShapeCell[]>> Build()
     {
-        var list = new List<ShapeCell[]>();
+        var smallCorner = SmallCornerFamily().ToArray();
 
-        for (int len = 1; len <= 5; len++)
+        return new List<IReadOnlyList<ShapeCell[]>>
         {
-            list.Add(Line(len, horizontal: true));
-            if (len > 1)
-            {
-                list.Add(Line(len, horizontal: false));
-            }
-        }
-
-        list.Add(Square(2));
-        list.Add(Square(3));
-
-        list.AddRange(LFamily());
-        list.AddRange(TFamily());
-        list.AddRange(SZFamily());
-        list.AddRange(Corner3Family());
-        list.AddRange(Corner5Family());
-        list.Add(Plus());
-
-        return list;
+            new[] { Line(1, true) },
+            new[] { Line(2, true), Line(2, false) },
+            new[] { Line(3, true), Line(3, false) },
+            new[] { Line(4, true), Line(4, false) },
+            new[] { Line(5, true), Line(5, false) },
+            new[] { Square(2) },
+            new[] { Rectangle(2, 3), Rectangle(3, 2) },
+            new[] { Square(3) },
+            BigCornerFamily().ToArray(),
+            LFamily().ToArray(),
+            SZFamily().ToArray(),
+            TFamily().ToArray(),
+            smallCorner,
+            smallCorner,
+        };
     }
 
     private static ShapeCell[] Cells(params (int Row, int Col)[] points)
@@ -65,25 +63,37 @@ public static class ShapeTemplates
         return Cells(points.ToArray());
     }
 
-    private static IEnumerable<ShapeCell[]> LFamily()
+    private static ShapeCell[] Rectangle(int height, int width)
     {
-        yield return Cells((0, 0), (1, 0), (2, 0), (2, 1));
-        yield return Cells((0, 0), (0, 1), (0, 2), (1, 0));
-        yield return Cells((0, 0), (0, 1), (1, 1), (2, 1));
-        yield return Cells((1, 0), (1, 1), (1, 2), (0, 2));
-
-        yield return Cells((0, 1), (1, 1), (2, 0), (2, 1));
-        yield return Cells((0, 0), (1, 0), (1, 1), (1, 2));
-        yield return Cells((0, 0), (0, 1), (1, 0), (2, 0));
-        yield return Cells((0, 0), (0, 1), (0, 2), (1, 2));
+        var points = new List<(int, int)>();
+        for (int r = 0; r < height; r++)
+        {
+            for (int c = 0; c < width; c++)
+            {
+                points.Add((r, c));
+            }
+        }
+        return Cells(points.ToArray());
     }
 
-    private static IEnumerable<ShapeCell[]> TFamily()
+    private static IEnumerable<ShapeCell[]> BigCornerFamily()
     {
-        yield return Cells((0, 0), (0, 1), (0, 2), (1, 1));
-        yield return Cells((0, 1), (1, 0), (1, 1), (2, 1));
-        yield return Cells((1, 0), (1, 1), (1, 2), (0, 1));
-        yield return Cells((0, 0), (1, 0), (2, 0), (1, 1));
+        yield return Cells((0, 0), (0, 1), (0, 2), (1, 0), (2, 0));
+        yield return Cells((0, 0), (0, 1), (0, 2), (1, 2), (2, 2));
+        yield return Cells((2, 0), (2, 1), (2, 2), (0, 0), (1, 0));
+        yield return Cells((2, 0), (2, 1), (2, 2), (0, 2), (1, 2));
+    }
+
+    private static IEnumerable<ShapeCell[]> LFamily()
+    {
+        yield return Cells((0, 0), (0, 1), (0, 2), (1, 0));
+        yield return Cells((0, 0), (0, 1), (0, 2), (1, 2));
+        yield return Cells((0, 2), (1, 0), (1, 1), (1, 2));
+        yield return Cells((0, 0), (1, 0), (1, 1), (1, 2));
+        yield return Cells((0, 0), (1, 0), (2, 0), (2, 1));
+        yield return Cells((0, 1), (1, 1), (2, 0), (2, 1));
+        yield return Cells((0, 0), (0, 1), (1, 1), (2, 1));
+        yield return Cells((0, 0), (0, 1), (1, 0), (2, 0));
     }
 
     private static IEnumerable<ShapeCell[]> SZFamily()
@@ -94,24 +104,19 @@ public static class ShapeTemplates
         yield return Cells((0, 1), (1, 0), (1, 1), (2, 0));
     }
 
-    private static IEnumerable<ShapeCell[]> Corner3Family()
+    private static IEnumerable<ShapeCell[]> TFamily()
+    {
+        yield return Cells((0, 1), (1, 0), (1, 1), (1, 2));
+        yield return Cells((0, 0), (1, 0), (1, 1), (2, 0));
+        yield return Cells((0, 0), (0, 1), (0, 2), (1, 1));
+        yield return Cells((0, 1), (1, 0), (1, 1), (2, 1));
+    }
+
+    private static IEnumerable<ShapeCell[]> SmallCornerFamily()
     {
         yield return Cells((0, 0), (1, 0), (1, 1));
-        yield return Cells((0, 0), (0, 1), (1, 0));
         yield return Cells((0, 0), (0, 1), (1, 1));
+        yield return Cells((0, 0), (0, 1), (1, 0));
         yield return Cells((0, 1), (1, 0), (1, 1));
-    }
-
-    private static IEnumerable<ShapeCell[]> Corner5Family()
-    {
-        yield return Cells((0, 0), (1, 0), (2, 0), (2, 1), (2, 2));
-        yield return Cells((0, 0), (0, 1), (0, 2), (1, 0), (2, 0));
-        yield return Cells((0, 0), (0, 1), (0, 2), (1, 2), (2, 2));
-        yield return Cells((0, 2), (1, 2), (2, 0), (2, 1), (2, 2));
-    }
-
-    private static ShapeCell[] Plus()
-    {
-        return Cells((0, 1), (1, 0), (1, 1), (1, 2), (2, 1));
     }
 }

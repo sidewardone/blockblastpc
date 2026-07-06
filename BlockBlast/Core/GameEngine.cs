@@ -4,16 +4,17 @@ namespace BlockBlast.Core;
 
 public sealed class GameEngine
 {
-    public GameBoard Board { get; } = new();
+    public GameBoard Board { get; private set; }
     public Shape?[] Tray { get; private set; }
     public int Score { get; private set; }
     public int BestScore { get; private set; }
     public int ComboStreak { get; private set; }
 
-    public GameEngine(int bestScore = 0)
+    public GameEngine(int boardSize = GameBoard.DefaultSize, int bestScore = 0)
     {
+        Board = new GameBoard(boardSize);
         BestScore = bestScore;
-        Tray = ShapeFactory.CreateTray();
+        Tray = TrayGenerator.Generate(Board);
     }
 
     public bool CanPlace(int trayIndex, int row, int col)
@@ -49,7 +50,7 @@ public sealed class GameEngine
         bool refilled = false;
         if (Tray.All(s => s == null))
         {
-            Tray = ShapeFactory.CreateTray();
+            Tray = TrayGenerator.Generate(Board);
             refilled = true;
         }
 
@@ -75,11 +76,11 @@ public sealed class GameEngine
         };
     }
 
-    public void Restart()
+    public void Restart(int? boardSize = null)
     {
-        Board.Reset();
+        Board = new GameBoard(boardSize ?? Board.Size);
         Score = 0;
         ComboStreak = 0;
-        Tray = ShapeFactory.CreateTray();
+        Tray = TrayGenerator.Generate(Board);
     }
 }
