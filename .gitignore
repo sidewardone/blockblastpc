@@ -1,0 +1,31 @@
+# Build output
+bin/
+obj/
+dist/
+*.user
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Claude Code / AI-assistant tooling traces
+.claude/
+.claude.json
+.claude.json.backup
+CLAUDE.md
+**/CLAUDE.md
+.mcp.json
+.cursor/
+.cursorrules
+.windsurf/
+.windsurfrules
+.aider*
+.copilot/
